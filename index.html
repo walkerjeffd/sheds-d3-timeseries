@@ -6,7 +6,7 @@
   <style>
 
   body {
-    font: 10px sans-serif;
+    font: 16px sans-serif;
   }
 
   .axis path,
@@ -29,7 +29,11 @@
   </style>
 </head>
 <body>
-<button id="btnMode">Change</button>
+Aggregate by: <select id="selMode">
+  <option value="inst">Instantaneous</option>
+  <option selected value="day">Day</option>
+  <option value="month">Month</option>
+</select>
 <div id="viz"></div>
 
 <script src="/public/js/bundle.js"></script>

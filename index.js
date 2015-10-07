@@ -2,13 +2,6 @@ var d3 = require('d3');
 
 var format = d3.time.format("%Y-%m-%d %H:%M:%S");
 
-var modes = {
-  'day': d3.time.day.floor,
-  'month': d3.time.month.floor
-};
-
-var mode = 'day';
-
 d3.csv('/public/data/data.csv')
   .row(function (d) {
     return {
@@ -17,18 +10,34 @@ d3.csv('/public/data/data.csv')
     };
   })
   .get(function (error, rows) {
-    var chart = timeChart()
-      .data(rows)
-      .aggregateBy(modes[mode]);
+    var aggregator = aggregate()
+      .by('day')
+      .data(rows);
 
-    d3.select('#btnMode').on('click', function () {
-      if (mode === 'day') {
-        mode = 'month';
+    var chart = timeChart()
+      .data(aggregator.output())
+      .xAccessor(function (d) {
+        return d.date;
+      })
+      .yAccessor(function (d) {
+        return d.mean;
+      });
+
+    d3.select('#selMode').on('change', function () {
+      var mode = d3.select(this)[0][0].value;
+
+      if (mode === 'inst') {
+        chart.data(rows)
+          .xAccessor(function (d) { return d.datetime; })
+          .yAccessor(function (d) { return d.value; });
       } else {
-        mode = 'day';
+        chart.data(aggregator.by(mode).output())
+          .xAccessor(function (d) { return d.date; })
+          .yAccessor(function (d) { return d.mean; });
       }
-      d3.select('#viz').call(chart.aggregateBy(modes[mode]));
+      d3.select('#viz').call(chart);
     });
+
     d3.select('#viz').call(chart);
   });
 
@@ -41,18 +50,16 @@ function timeChart () {
       y = d3.scale.linear().range([height - margin.top - margin.bottom, 0]),
       xAxis = d3.svg.axis().scale(x).orient('bottom'),
       yAxis = d3.svg.axis().scale(y).orient('left'),
-      rawData,
+      xAccessor = function (d) { return d[0]; },
+      yAccessor = function (d) { return d[1]; },
       data,
       svg, g;
 
   function chart (selection) {
     selection.each(function (d, i) {
-      y.domain(d3.extent(data, function (d) { return d.mean; }));
-      x.domain(d3.extent(data, function (d) { return d.date; }));
-
       var line = d3.svg.line()
-          .x(function (d) { return x(d.date); })
-          .y(function (d) { return y(d.mean); });
+          .x(function (d) { return x(xAccessor(d)); })
+          .y(function (d) { return y(yAccessor(d)); });
 
       svg = d3.select(this).selectAll('svg');
 
@@ -60,12 +67,29 @@ function timeChart () {
         svg = d3.select(this).append('svg')
           .attr('height', height)
           .attr('width', width);
+
         g = svg.append('g')
-          .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+          .attr('transform', 'translate(' + margin.left + ',' +
+                                            margin.top + ')');
+        svg.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', 'translate(' + margin.left + ',' + (height - margin.bottom) + ')');
+
+        svg.append('g')
+          .attr('class', 'y axis')
+          .attr('transform', 'translate(' + margin.left + ', ' + margin.top + ')');
       }
 
       if (data) {
-        console.log('data');
+        x.domain(d3.extent(data, function (d) { return xAccessor(d); }));
+        y.domain(d3.extent(data, function (d) { return yAccessor(d); }));
+
+        svg.select('.x.axis')
+          .call(xAxis);
+
+        svg.select('.y.axis')
+          .call(yAxis);
+
         var lines = g.selectAll('path')
           .data([data]);
 
@@ -93,43 +117,83 @@ function timeChart () {
     return chart;
   };
 
+  chart.xAccessor = function (_) {
+    if (!arguments.length) {
+      return xAccessor;
+    }
+    xAccessor = _;
+    return chart;
+  };
+
+  chart.yAccessor = function (_) {
+    if (!arguments.length) {
+      return yAccessor;
+    }
+    yAccessor = _;
+    return chart;
+  };
+
   chart.data = function (_) {
     if (!arguments.length) {
       return data;
     }
-    rawData = _;
-    data = aggregate(rawData, aggregateBy);
-    return chart;
-  };
-
-  chart.aggregateBy = function (_) {
-    if (!arguments.length) {
-      return aggregateBy;
-    }
-    aggregateBy = _;
-    data = aggregate(rawData, aggregateBy);
+    data = _;
     return chart;
   };
 
   return chart;
 }
 
-function aggregate (data, by) {
-  var nested = d3.nest()
-      .key(function (d) { return by(d.datetime); })
+function aggregate () {
+  var data = [],
+      by = 'day',
+      x = function (d) { return d.datetime; },
+      y = function (d) { return d.value; };
+
+  var modes = {
+    'day': d3.time.day.floor,
+    'month': d3.time.month.floor
+  };
+
+  function fun () {
+
+  }
+
+  fun.by = function (_) {
+    if (!arguments.length) {
+      return by;
+    }
+    by = _;
+    return fun;
+  };
+
+  fun.data = function (_) {
+    if (!arguments.length) {
+      return data;
+    }
+    data = _;
+    return fun;
+  };
+
+  fun.output = function () {
+    var nested = d3.nest()
+      .key(function (d) { return modes[by](x(d)); })
       .rollup(function (items) {
         return {
           n: items.length,
-          max: d3.max(items, function (d) { return d.value; }),
-          min: d3.min(items, function (d) { return d.value; }),
-          mean: d3.mean(items, function (d) { return d.value; })
+          max: d3.max(items, y),
+          min: d3.min(items, y),
+          mean: d3.mean(items, y)
         };
       })
       .entries(data);
 
-  return nested.map(function (d) {
-    var obj = d.values;
-    obj.date = new Date(d.key)
-    return obj;
-  });
+    return nested.map(function (d) {
+      var obj = d.values;
+      obj.date = new Date(d.key);
+      return obj;
+    });
+  };
+
+  return fun;
 }
