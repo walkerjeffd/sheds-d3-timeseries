@@ -1,6 +1,6 @@
 var gulp = require('gulp')
 
-var watchify = require('../..')
+var watchify = require('watchify')
 
 var bundlePaths = {
     src: [
