@@ -1,3 +1,5 @@
+'use strict';
+
 var d3 = require('d3');
 
 var timeChart = require('./timeChart.js');
@@ -20,6 +22,7 @@ d3.csv('/public/data/data.csv')
 
     var chart = timeChart()
       .data(aggregator(rows))
+      .showBand(true)
       .x(function (d) {
         return d.date;
       })
@@ -33,11 +36,13 @@ d3.csv('/public/data/data.csv')
       if (mode === 'inst') {
         chart
           .data(rows)
+          .showBand(false)
           .x(function (d) { return d.datetime; })
           .y(function (d) { return d.value; });
       } else {
         chart
           .data(aggregator.by(mode).run(rows))
+          .showBand(true)
           .x(function (d) { return d.date; })
           .y(function (d) { return d.mean; });
       }
