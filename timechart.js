@@ -62,15 +62,6 @@ function timeChart () {
 
         x.domain(d3.extent(data, function (d) { return xAccessor(d); }));
 
-        // var clip = svg.append('defs').append('clipPath')
-        //     .attr('id', 'clip-0')
-        //     .append('rect')
-        //     .attr('id', 'clip-rect')
-        //     .attr('x', '0')
-        //     .attr('y', '0')
-        //     .attr('width', width)
-        //     .attr('height', height);
-
         svg.append('rect')
           .attr('width', width)
           .attr('height', height)
@@ -78,8 +69,6 @@ function timeChart () {
           .call(zoom);
 
         zoom.x(x);
-
-        // svg.selectAll('rect.overlay').call(zoom);
       }
 
       zoomed();
@@ -97,10 +86,6 @@ function timeChart () {
     zoom.translate([translate, 0]);
 
     if (data) {
-      console.log('zoomed');
-      // x.domain(d3.extent(data, function (d) { return xAccessor(d); }));
-      // d3.behavior.zoom().x(x);
-
       if (showBand) {
         y.domain([d3.min(data, function (d) { return d.min; }),
                   d3.max(data, function (d) { return d.max; })]);
