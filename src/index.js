@@ -9,7 +9,7 @@ var format = d3.time.format('%Y-%m-%d %H:%M:%S');
 
 var mode;
 
-d3.csv('/public/data/data.csv')
+d3.csv('/data/data.csv')
   .row(function (d) {
     return {
       datetime: format.parse(d.datetime),

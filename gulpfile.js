@@ -11,7 +11,7 @@ var assign = require('lodash.assign');
 
 // add custom browserify options here
 var customOpts = {
-  entries: ['./index.js'],
+  entries: ['./src/index.js'],
   debug: true
 };
 
