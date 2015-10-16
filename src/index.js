@@ -2,7 +2,7 @@
 
 var d3 = require('d3');
 
-var timeChart = require('./timeChart.js');
+var timeChart = require('./timechart.js');
 var aggregate = require('./aggregate.js');
 
 var format = d3.time.format('%Y-%m-%d %H:%M:%S');
