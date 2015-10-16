@@ -13,79 +13,96 @@ function timeChart () {
       yAxis = d3.svg.axis().scale(y).orient('left'),
       xAccessor = function (d) { return d[0]; },
       yAccessor = function (d) { return d[1]; },
-      area = d3.svg.area()
-        .x(function (d) { return x(xAccessor(d)); })
-        .y0(function (d) { return y(d.max); })
-        .y1(function (d) { return y(d.min); })
-        .interpolate('step-after'),
-      line = d3.svg.line()
-        .x(function (d) { return x(xAccessor(d)); })
-        .y(function (d) { return y(yAccessor(d)); })
-        .interpolate('step-after'),
-      zoom = d3.behavior.zoom()
-        .on('zoom', zoomed),
       data,
       showBand = true,
-      svg, g, container;
+      svg, g, container,
+      onZoom = function () {};
 
-  function chart (selection) {
-    selection.each(function (d, i) {
-      svg = d3.select(this).selectAll('svg');
+  var area = d3.svg.area()
+    .x(function (d) { return x(xAccessor(d)); })
+    .y0(function (d) { return y(d.max); })
+    .y1(function (d) { return y(d.min); })
+    .interpolate('step-after');
 
-      if (svg.empty()) {
-        svg = d3.select(this)
-          .append('svg')
-            .attr('height', height + margin.top + margin.bottom)
-            .attr('width', width + margin.left + margin.right)
-          .append('g')
-            .attr('transform', 'translate(' + margin.left + ',' +
-                                              margin.top + ')');
+  var line = d3.svg.line()
+    .x(function (d) { return x(xAccessor(d)); })
+    .y(function (d) { return y(yAccessor(d)); })
+    .interpolate('step-after');
 
-        svg.append('clipPath')
-            .attr('id', 'clip')
-          .append('rect')
-            .attr('x', x(0))
-            .attr('y', y(1))
-            .attr('width', x(1) - x(0))
-            .attr('height', y(0) - y(1));
+  var zoom = d3.behavior.zoom()
+    .scaleExtent([1, 80])
+    .on('zoom', zoomed);
 
-        svg.append('g')
-          .attr('class', 'x axis')
-          .attr('transform', 'translate(0,' + height + ')');
+  var customTimeFormat = d3.time.format.multi([
+    ['.%L', function (d) { return d.getMilliseconds(); }],
+    [':%S', function (d) { return d.getSeconds(); }],
+    ['%I:%M', function (d) { return d.getMinutes(); }],
+    ['%I %p', function (d) { return d.getHours(); }],
+    ['%b %d', function (d) { return d.getDay() && d.getDate() != 1; }],
+    ['%b %d', function (d) { return d.getDate() != 1; }],
+    ['%b', function (d) { return d.getMonth(); }],
+    ['%Y', function () { return true; }]
+  ]);
+  xAxis.tickFormat(customTimeFormat).ticks(8);
 
-        svg.append('g')
-          .attr('class', 'y axis');
+  function chart (el) {
+    if (el.selectAll('svg').empty()) {
+      svg = el
+        .append('svg')
+          .attr('height', height + margin.top + margin.bottom)
+          .attr('width', width + margin.left + margin.right)
+        .append('g')
+          .attr('transform', 'translate(' + margin.left + ',' +
+                                            margin.top + ')');
 
-        container = svg.append('g')
-          .attr('class', 'lines')
-          .attr("clip-path", "url(#clip)");
-
-        x.domain(d3.extent(data, function (d) { return xAccessor(d); }));
-
-        svg.append('rect')
+      svg.append('clipPath')
+          .attr('id', 'clip')
+        .append('rect')
+          .attr('x', 0)
+          .attr('y', 0)
           .attr('width', width)
-          .attr('height', height)
-          .attr('class', 'pane')
-          .call(zoom);
+          .attr('height', height);
 
-        zoom.x(x);
-      }
+      svg.append('g')
+        .attr('class', 'x axis')
+        .attr('transform', 'translate(0,' + height + ')');
 
-      zoomed();
-    });
+      svg.append('g')
+        .attr('class', 'y axis');
+
+      container = svg.append('g')
+        .attr('class', 'data')
+        .attr('clip-path', 'url(#clip)');
+
+      container.append('g').attr('class', 'areas');
+      container.append('g').attr('class', 'lines');
+
+      svg.append('rect')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('class', 'pane')
+        .call(zoom);
+
+      x.domain(d3.extent(data, xAccessor));
+      zoom.x(x);
+    }
+
+    zoomed();
   }
 
   function zoomed() {
-    var xExtent = d3.extent(data, xAccessor);
-    var distanceToEnd = x.range()[1] - x(xExtent[1]);
-
-    var translate = [zoom.translate()[0],
-                     distanceToEnd + zoom.translate()[0]];
-    translate = d3.max(translate);
-    translate = d3.min([translate, 0]);
-    zoom.translate([translate, 0]);
-
     if (data) {
+      var xExtent = d3.extent(data, xAccessor);
+
+      // clamp x-axis zoom
+      if (x.domain()[0] < xExtent[0]) {
+        zoom.translate([zoom.translate()[0] - x(xExtent[0]) + x.range()[0],
+                        zoom.translate()[1]]);
+      } else if (x.domain()[1] > xExtent[1]) {
+        zoom.translate([zoom.translate()[0] - x(xExtent[1]) + x.range()[1],
+                        zoom.translate()[1]]);
+      }
+
       if (showBand) {
         y.domain([d3.min(data, function (d) { return d.min; }),
                   d3.max(data, function (d) { return d.max; })]);
@@ -93,23 +110,28 @@ function timeChart () {
         y.domain(d3.extent(data, function (d) { return yAccessor(d); }));
       }
 
+      onZoom(x.domain());
+
       svg.select('.x.axis')
         .call(xAxis);
 
       svg.select('.y.axis')
         .call(yAxis);
 
-      var areas = container.selectAll('.area')
-        .data([data]);
+      var areas = container.select('g.areas')
+        .selectAll('.area')
+        .data(showBand ? [data] : []);
 
       areas.enter().append('path')
         .attr('class', 'area')
         .attr('fill', 'lightgray');
 
-      areas.attr('d', area)
-        .style('opacity', 1 * showBand);
+      areas.attr('d', area);
 
-      var lines = container.selectAll('.line')
+      areas.exit().remove();
+
+      var lines = container.select('g.lines')
+        .selectAll('.line')
         .data([data]);
 
       lines.enter().append('path')
@@ -164,6 +186,14 @@ function timeChart () {
       return showBand;
     }
     showBand = _;
+    return chart;
+  };
+
+  chart.onZoom = function (_) {
+    if (!arguments.length) {
+      return onZoom;
+    }
+    onZoom = _;
     return chart;
   };
 
