@@ -12,5 +12,5 @@ gulp watch
 ## Run Server
 
 ```sh
-http-server .
+http-server ./public
 ```
